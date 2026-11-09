@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>내일가치연구소 - 정산 및 재정 관리 마스터 (v28.1)</title>
+    <title>내일가치연구소 - 정산 및 재정 관리 마스터 (v30.0)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -27,7 +27,7 @@
                 <div class="flex items-center gap-2.5">
                     <div>
                         <h1 class="text-base sm:text-lg font-bold tracking-tight leading-tight">내일가치연구소</h1>
-                        <p class="text-[10px] sm:text-xs text-slate-400">정산 및 재정 관리 마스터 (v28.1)</p>
+                        <p class="text-[10px] sm:text-xs text-slate-400">정산 및 재정 관리 마스터 (v30.0)</p>
                     </div>
                 </div>
             </div>
@@ -303,7 +303,11 @@
                         <input type="month" id="p-month" min="2000-01" max="2099-12" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">파트너 지급예정일 <span class="text-slate-400 font-normal">(선택)</span></label>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">행사일 (실제 행사일)</label>
+                        <input type="date" id="p-event-date" min="2000-01-01" max="2099-12-31" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">파트너 지급예정일</label>
                         <input type="date" id="p-partner-date" min="2000-01-01" max="2099-12-31" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
                     </div>
                     <div class="sm:col-span-2">
@@ -682,8 +686,8 @@
     </div>
 
     <script>
-        // 🔐 접속 비밀번호 설정 (원하시는 비밀번호로 변경하세요)
-        const SITE_PASSWORD = "0530"; // 예시 비밀번호
+        // 🔐 접속 비밀번호 설정
+        const SITE_PASSWORD = "1234";
 
         // 접속 시 비밀번호 인증 로직
         (function checkAuth() {
@@ -715,6 +719,15 @@
         let pieChart = null;
         let isArchiveFolderOpen = false;
 
+        function formatDateYYYYMMDD(dateStr) {
+            if (!dateStr) return '';
+            const clean = String(dateStr).slice(0, 10);
+            if (clean.length === 10 && clean.includes('-')) {
+                return clean.replace(/-/g, '.');
+            }
+            return clean;
+        }
+
         // 구글 시트로부터 데이터 비동기 로드
         async function loadDataFromCloud() {
             try {
@@ -726,6 +739,7 @@
                         ...p, 
                         id: Number(p.id), 
                         partnerDate: p.partnerDate ? String(p.partnerDate).slice(0, 10) : '', 
+                        eventDate: p.eventDate ? String(p.eventDate).slice(0, 10) : '', 
                         reserve: Number(p.reserve), 
                         split: Number(p.split), 
                         partnerTaxRate: Number(p.partnerTaxRate), 
@@ -813,6 +827,7 @@
                                 ...p, 
                                 id: Number(p.id), 
                                 partnerDate: p.partnerDate ? String(p.partnerDate).slice(0, 10) : '', 
+                                eventDate: p.eventDate ? String(p.eventDate).slice(0, 10) : '', 
                                 reserve: Number(p.reserve), 
                                 split: Number(p.split), 
                                 partnerTaxRate: p.partnerTaxRate ? Number(p.partnerTaxRate) : 0.033, 
@@ -918,10 +933,12 @@
             e.preventDefault();
             const editId = document.getElementById('p-edit-id').value;
             const rawPartnerDate = document.getElementById('p-partner-date').value;
+            const rawEventDate = document.getElementById('p-event-date').value;
             const projData = {
                 name: document.getElementById('p-name').value,
                 month: document.getElementById('p-month').value,
                 partnerDate: rawPartnerDate ? rawPartnerDate.slice(0, 10) : '',
+                eventDate: rawEventDate ? rawEventDate.slice(0, 10) : '',
                 client: document.getElementById('p-client').value,
                 contactPerson: document.getElementById('p-contact-person').value,
                 contactPhone: document.getElementById('p-contact-phone').value,
@@ -958,6 +975,7 @@
             document.getElementById('p-name').value = p.name;
             document.getElementById('p-month').value = p.month;
             document.getElementById('p-partner-date').value = p.partnerDate ? p.partnerDate.slice(0, 10) : '';
+            document.getElementById('p-event-date').value = p.eventDate ? p.eventDate.slice(0, 10) : '';
             document.getElementById('p-client').value = p.client || '';
             document.getElementById('p-contact-person').value = p.contactPerson || '';
             document.getElementById('p-contact-phone').value = p.contactPhone || '';
@@ -1097,7 +1115,10 @@
         function openTodoModal(todoId = null, defaultStatus = '시작 전') {
             const modal = document.getElementById('todo-modal');
             const projectSelect = document.getElementById('todo-project-id');
-            projectSelect.innerHTML = projects.filter(p => !p.isCompleted).map(p => `<option value="${p.id}">${p.name} (${p.month})</option>`).join('');
+            projectSelect.innerHTML = projects.filter(p => !p.isCompleted).map(p => {
+                const evStr = p.eventDate ? ` (${formatDateYYYYMMDD(p.eventDate)})` : '';
+                return `<option value="${p.id}">${p.name}${evStr}</option>`;
+            }).join('');
 
             if (currentTodoSelectedProjectId !== null) {
                 projectSelect.value = currentTodoSelectedProjectId;
@@ -1287,7 +1308,10 @@
             if (activeProjectsOptions.length === 0) {
                 selectEl.innerHTML = '<option value="">진행중인 사업 없음 (사업내용에서 완료 해제 필요)</option>';
             } else {
-                selectEl.innerHTML = activeProjectsOptions.map(p => `<option value="${p.id}">${p.name} (${p.month})</option>`).join('');
+                selectEl.innerHTML = activeProjectsOptions.map(p => {
+                    const evStr = p.eventDate ? ` (${formatDateYYYYMMDD(p.eventDate)})` : '';
+                    return `<option value="${p.id}">${p.name}${evStr}</option>`;
+                }).join('');
             }
 
             if (projects.length === 0) {
@@ -1324,12 +1348,14 @@
                     : '<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">진행중</span>';
 
                 const taxPercentText = Math.round(taxRate * 1000) / 10;
-                const cleanPartnerDate = p.partnerDate ? String(p.partnerDate).slice(0, 10) : '미정';
+                const cleanPartnerDate = p.partnerDate ? formatDateYYYYMMDD(p.partnerDate) : '미정';
+                const cleanEventDate = p.eventDate ? formatDateYYYYMMDD(p.eventDate) : '';
 
                 return `
                     <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border ${p.isCompleted ? 'border-slate-300 bg-slate-50/50 opacity-90' : 'border-slate-200'} space-y-3">
                         <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
                             <div class="flex items-center gap-2.5 flex-wrap">
+                                ${cleanEventDate ? `<span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-lg">${cleanEventDate}</span>` : ''}
                                 <h3 class="font-bold text-slate-900 text-sm sm:text-base">${p.name}</h3>
                                 ${completedBadge}
                             </div>
@@ -1366,7 +1392,7 @@
                         </div>
 
                         <div class="flex flex-col sm:flex-row justify-between text-[11px] sm:text-xs text-slate-600 pt-1 px-1 gap-1">
-                            <div>발주사: <b class="text-slate-800">${p.client || '미입력'}</b> | 담당자: <b class="text-slate-800">${p.contactPerson || '미입력'}</b> (연락처: <b class="text-slate-800">${p.contactPhone || '미입력'}</b> / 이메일: <b class="text-slate-800">${p.contactEmail || '미입력'}</b>) | 파트너 지급일: <b class="text-indigo-600">${cleanPartnerDate}</b></div>
+                            <div>발주사: <b class="text-slate-800">${p.client || '미입력'}</b> | 담당자: <b class="text-slate-800">${p.contactPerson || '미입력'}</b> (연락처: <b class="text-slate-800">${p.contactPhone || '미입력'}</b> / 이메일: <b class="text-slate-800">${p.contactEmail || '미입력'}</b>) | 행사일: <b class="text-teal-600">${cleanEventDate || '미정'}</b> | 파트너 지급일: <b class="text-indigo-600">${cleanPartnerDate}</b></div>
                             <div>대표 배분액(세후): <b class="text-emerald-700">${formatKW(repShare)}</b> | 파트너 배분액(총액지급: ${formatKW(partnerGross)} / 원천세(${taxPercentText}%): ${formatKW(partnerTax)} 회사부담 차감 후 실수령: <b class="text-indigo-700">${formatKW(partnerNet)}</b>)</div>
                         </div>
                         ${p.memo ? `<div class="text-[11px] text-slate-500 bg-amber-50/50 p-2 rounded border border-amber-100/60">메모: ${p.memo}</div>` : ''}
@@ -1400,6 +1426,7 @@
             container.innerHTML = targetExpenses.map(ex => {
                 const proj = projects.find(p => p.id === ex.projectId);
                 const projName = proj ? proj.name : '삭제된 사업';
+                const projEventDateStr = proj && proj.eventDate ? ` (${formatDateYYYYMMDD(proj.eventDate)})` : '';
 
                 let badgeColor = 'bg-slate-100 text-slate-700';
                 if (ex.status === '지급완료') badgeColor = 'bg-emerald-100 text-emerald-800 font-bold';
@@ -1415,7 +1442,7 @@
                         <div class="space-y-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-bold">${ex.date}</span>
-                                <span class="bg-teal-50 text-teal-800 px-2 py-0.5 rounded text-[11px] font-semibold">${projName}</span>
+                                <span class="bg-teal-50 text-teal-800 px-2 py-0.5 rounded text-[11px] font-semibold">${projName}${projEventDateStr}</span>
                                 <span class="px-2 py-0.5 rounded text-[11px] ${badgeColor}">${ex.status}</span>
                                 ${ex.isWithholdingTax ? `<span class="bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-bold">원천세 ${taxRatePercent}% 대상</span>` : ''}
                             </div>
@@ -1446,12 +1473,13 @@
             const map = {};
 
             projects.forEach(p => {
-                const m = p.month || '미분류';
-                if (!map[m]) map[m] = { month: m, revenue: 0, expense: 0, count: 0 };
-                map[m].revenue += p.amount;
+                const rawMonth = p.month || '미분류';
+                const formattedMonth = rawMonth.length >= 7 ? rawMonth.slice(0, 7).replace('-', '.') : rawMonth;
+                if (!map[formattedMonth]) map[formattedMonth] = { month: formattedMonth, revenue: 0, expense: 0, count: 0 };
+                map[formattedMonth].revenue += p.amount;
                 const pExps = expenses.filter(ex => ex.projectId === p.id);
-                map[m].expense += pExps.reduce((acc, cur) => acc + cur.amount, 0);
-                map[m].count += 1;
+                map[formattedMonth].expense += pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                map[formattedMonth].count += 1;
             });
 
             const sortedMonths = Object.keys(map).sort().reverse();
@@ -1706,7 +1734,8 @@
         function renderDashboardCharts() {
             const monthsMap = {};
             projects.forEach(p => {
-                const m = p.month || '2026-01';
+                const rawMonth = p.month || '2026-01';
+                const m = rawMonth.length >= 7 ? rawMonth.slice(0, 7).replace('-', '.') : rawMonth;
                 if (!monthsMap[m]) monthsMap[m] = { revenue: 0, expense: 0, margin: 0 };
                 monthsMap[m].revenue += p.amount;
                 const pExps = expenses.filter(ex => ex.projectId === p.id);
@@ -1793,15 +1822,18 @@
                 if (completedProjects.length === 0) {
                     archiveContainer.innerHTML = '<div class="text-xs text-slate-400 py-2 px-2">완료된 사업이 없습니다.</div>';
                 } else {
-                    archiveContainer.innerHTML = completedProjects.map(cp => `
-                        <div class="bg-white p-2.5 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
-                            <div class="flex items-center gap-2">
-                                <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">${cp.month}</span>
-                                <span class="font-bold text-slate-800">${cp.name}</span>
+                    archiveContainer.innerHTML = completedProjects.map(cp => {
+                        const cpEventDate = cp.eventDate ? formatDateYYYYMMDD(cp.eventDate) : '';
+                        return `
+                            <div class="bg-white p-2.5 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+                                <div class="flex items-center gap-2">
+                                    ${cpEventDate ? `<span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">${cpEventDate}</span>` : ''}
+                                    <span class="font-bold text-slate-800">${cp.name}</span>
+                                </div>
+                                <button type="button" onclick="toggleProjectCompleted(${cp.id})" class="text-xs text-indigo-600 hover:underline font-semibold">완료 취소하기</button>
                             </div>
-                            <button type="button" onclick="toggleProjectCompleted(${cp.id})" class="text-xs text-indigo-600 hover:underline font-semibold">완료 취소하기</button>
-                        </div>
-                    `).join('');
+                        `;
+                    }).join('');
                 }
 
                 if (activeProjects.length === 0) {
@@ -1814,12 +1846,13 @@
                     const doneCount = pTodos.filter(t => t.status === 'Done').length;
                     const totalCount = pTodos.length;
                     const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+                    const pEventDateStr = p.eventDate ? formatDateYYYYMMDD(p.eventDate) : '';
 
                     return `
                         <div onclick="viewProjectTodos(${p.id})" class="bg-white hover:bg-slate-50 p-5 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition cursor-pointer space-y-3 flex flex-col justify-between">
                             <div class="space-y-1.5">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-lg">${p.month}</span>
+                                    ${pEventDateStr ? `<span class="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-lg">${pEventDateStr}</span>` : '<span></span>'}
                                     <span class="text-xs text-slate-500 font-semibold">업무 ${totalCount}건</span>
                                 </div>
                                 <h3 class="font-bold text-slate-900 text-base">${p.name}</h3>
@@ -1849,7 +1882,8 @@
                 }
 
                 document.getElementById('todo-board-title').innerText = currentProj.name;
-                document.getElementById('todo-board-month-badge').innerText = currentProj.month;
+                const boardMonthBadge = document.getElementById('todo-board-month-badge');
+                boardMonthBadge.innerText = currentProj.eventDate ? formatDateYYYYMMDD(currentProj.eventDate) : currentProj.month;
 
                 const pTodos = todos.filter(t => t.projectId === currentProj.id);
                 const startTodos = pTodos.filter(t => t.status === '시작 전');
@@ -1882,7 +1916,7 @@
                     <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 space-y-2 hover:border-indigo-300 transition group">
                         <div class="flex items-start justify-between gap-2">
                             <h4 onclick="openTodoModal(${t.id})" class="font-bold text-slate-900 text-xs sm:text-sm cursor-pointer hover:text-indigo-600 transition line-clamp-2">${t.title}</h4>
-                            <button type="button" onclick="openTodoModal(${t.id})" class="text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition p-1"><i class="fa-solid fa-pen text-xs"></i></button>
+                            <button type=",button" onclick="openTodoModal(${t.id})" class="text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition p-1"><i class="fa-solid fa-pen text-xs"></i></button>
                         </div>
                         ${t.desc ? `<p class="text-xs text-slate-500 line-clamp-2 bg-slate-50 p-2 rounded">${t.desc}</p>` : ''}
                         <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
