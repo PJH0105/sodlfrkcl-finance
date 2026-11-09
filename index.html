@@ -1,0 +1,1889 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내일가치연구소 - 정산 및 재정 관리 마스터 (v27.1)</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif; }
+        .tab-active { border-bottom: 3px solid #1e40af; color: #1e40af; font-weight: 700; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-10">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 py-3 sm:py-4 flex flex-col sm:flex-row justify-between items-center gap-3">
+            <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-start">
+                <div class="flex items-center gap-2.5">
+                    <div>
+                        <h1 class="text-base sm:text-lg font-bold tracking-tight leading-tight">내일가치연구소</h1>
+                        <p class="text-[10px] sm:text-xs text-slate-400">정산 및 재정 관리 마스터 (v27.1)</p>
+                    </div>
+                </div>
+            </div>
+            <!-- 백업/복원 버튼 -->
+            <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button type="button" onclick="exportData()" class="flex-1 sm:flex-none text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 px-3 py-2 rounded-lg border border-slate-700 transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-download text-blue-400"></i> 백업
+                </button>
+                <button type="button" onclick="document.getElementById('import-file').click()" class="flex-1 sm:flex-none text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg transition flex items-center justify-center gap-1.5 shadow-sm">
+                    <i class="fa-solid fa-upload"></i> 복원
+                </button>
+                <input type="file" id="import-file" accept=".json" onchange="importData(event)" class="hidden">
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4 mb-5">
+            <div class="bg-white p-3.5 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-[11px] sm:text-xs text-slate-500 font-medium mb-1">총 계약금액 (수입)</div>
+                <div id="kpi-total-contract" class="text-base sm:text-xl font-bold text-slate-900">0 원</div>
+            </div>
+            <div class="bg-white p-3.5 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-[11px] sm:text-xs text-slate-500 font-medium mb-1">총 지출 (지급예정 포함)</div>
+                <div id="kpi-total-expense" class="text-base sm:text-xl font-bold text-rose-600">0 원</div>
+            </div>
+            <div class="bg-white p-3.5 sm:p-4 rounded-xl shadow-sm border border-slate-200 space-y-1">
+                <div class="flex justify-between items-center">
+                    <span class="text-[11px] sm:text-xs text-slate-500 font-medium">총 회사 유보금</span>
+                    <span class="text-[9px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded font-bold">세금차감 후 현금</span>
+                </div>
+                <div id="kpi-total-reserve" class="text-base sm:text-lg font-bold text-blue-600">0 원</div>
+                <div class="pt-1 border-t border-slate-100 text-[10px] sm:text-[11px] text-slate-500 flex flex-col gap-0.5">
+                    <div class="flex justify-between">
+                        <span>종소세+부가세 납부예정:</span>
+                        <span id="kpi-pending-tax" class="font-semibold text-rose-600">0 원</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-slate-700">
+                        <span>진짜 회사 순 현금자산:</span>
+                        <span id="kpi-net-reserve" class="text-blue-700">0 원</span>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white p-3.5 sm:p-4 rounded-xl shadow-sm border border-slate-200">
+                <div class="text-[11px] sm:text-xs text-slate-500 font-medium mb-1">총 개인 분배 (세후)</div>
+                <div id="kpi-total-payout" class="text-base sm:text-xl font-bold text-emerald-600">0 원</div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <div class="flex border-b border-slate-200 mb-5 bg-white rounded-t-xl px-2 pt-1 shadow-sm overflow-x-auto no-scrollbar">
+            <button type="button" onclick="switchTab('dashboard')" id="tab-dashboard" class="whitespace-nowrap px-3.5 py-2.5 font-medium text-xs sm:text-sm tab-active transition flex items-center gap-1.5">
+                <i class="fa-solid fa-gauge-high"></i> 대시보드
+            </button>
+            <button type="button" onclick="switchTab('projects')" id="tab-projects" class="whitespace-nowrap px-3.5 py-2.5 font-medium text-xs sm:text-sm text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-folder-closed"></i> 사업내용
+            </button>
+            <button type="button" onclick="switchTab('expenses')" id="tab-expenses" class="whitespace-nowrap px-3.5 py-2.5 font-medium text-xs sm:text-sm text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-receipt"></i> 지출/지급예정
+            </button>
+            <button type="button" onclick="switchTab('summary')" id="tab-summary" class="whitespace-nowrap px-3.5 py-2.5 font-medium text-xs sm:text-sm text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar-days"></i> 월별 요약
+            </button>
+            <button type="button" onclick="switchTab('todo')" id="tab-todo" class="whitespace-nowrap px-3.5 py-2.5 font-medium text-xs sm:text-sm text-slate-500 hover:text-slate-800 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-list-check text-indigo-600"></i> To-Do 업무관리
+            </button>
+        </div>
+
+        <!-- TAB 0: 대시보드 -->
+        <div id="content-dashboard" class="space-y-5">
+            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <div class="flex justify-between items-center border-b pb-2.5">
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-sm sm:text-base font-bold text-slate-900">주요 미완료 업무 (시작 전 · 진행 중)</h3>
+                            <p class="text-[11px] text-slate-500">카드를 클릭하면 해당 사업의 칸반보드로 곧바로 이동합니다.</p>
+                        </div>
+                    </div>
+                    <button type="button" onclick="switchTab('todo')" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1">
+                        전체 보드 이동 <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+                <div id="dash-active-todos-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                </div>
+            </div>
+
+            <div class="bg-gradient-to-r from-amber-500 to-orange-600 text-white p-4 sm:p-5 rounded-xl shadow-md">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="bg-amber-900/40 text-amber-100 text-[10px] sm:text-xs px-2.5 py-1 rounded-full font-semibold border border-amber-300/30">
+                        <i class="fa-regular fa-clock mr-1"></i> 원천세 신고·납부 기일 (지급 다음 달 10일)
+                    </span>
+                    <span id="tax-dday-badge" class="bg-white text-orange-700 text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-full shadow-sm">
+                        마감 기일 확인 중
+                    </span>
+                </div>
+                <h3 id="dash-tax-title-text" class="text-base sm:text-lg font-bold mb-1">익월 원천세 예정 납부 안내</h3>
+                <p class="text-xs text-amber-100 mb-3">
+                    당월에 지급(예정)되는 파트너 수수료(3.3%/8.8%) 및 원천세 대상 지출은 <b>다음 달 10일 이전</b>에 홈택스로 납부됩니다.
+                </p>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs sm:text-sm">
+                    <div class="bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
+                        <span class="text-[11px] text-amber-100 block">파트너 배분 원천세 (3.3%/8.8%)</span>
+                        <span id="dash-partner-tax" class="text-base sm:text-lg font-bold text-white">0 원</span>
+                    </div>
+                    <div class="bg-white/10 backdrop-blur-md p-3 rounded-lg border border-white/20">
+                        <span class="text-[11px] text-amber-100 block">지출 경비 원천세 (3.3%/8.8%)</span>
+                        <span id="dash-expense-tax" class="text-base sm:text-lg font-bold text-white">0 원</span>
+                    </div>
+                    <div class="bg-white/20 backdrop-blur-md p-3 rounded-lg border border-white/30 flex justify-between items-center">
+                        <div>
+                            <span class="text-[11px] text-amber-100 block">납부 예정 총액</span>
+                            <span id="dash-tax-due-amount" class="text-lg sm:text-xl font-black text-white">0 원</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-[11px] text-amber-100 block">납부 기일</span>
+                            <span id="dash-tax-due-date" class="font-bold text-white text-xs">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-indigo-600"></i> 개인사업자 연도별 예상 납부 세금 추계
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-0.5">등록된 매출과 지출 경비를 바탕으로 개인사업자 예상 누진세율 및 부가세를 자동 추산합니다.</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <label for="tax-year-select" class="text-xs font-semibold text-slate-600">조회 연도:</label>
+                        <select id="tax-year-select" onchange="renderTaxEstimates()" class="px-2.5 py-1 text-xs border rounded-lg bg-slate-50 font-bold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500">
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs sm:text-sm">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2.5">
+                        <div class="font-bold text-slate-700 border-b pb-1.5 flex justify-between items-center">
+                            <span><i class="fa-solid fa-wallet text-slate-500 mr-1"></i> <span id="tax-card-year-1">2026</span>년 손익 요약</span>
+                            <span class="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded">과세 기반</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-500">연간 총 수입 (공급가액)</span>
+                            <span id="tax-year-revenue" class="font-semibold text-slate-900">0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-500">연간 필요경비 (지출총액)</span>
+                            <span id="tax-year-expense" class="font-semibold text-rose-600">0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-dashed">
+                            <span class="font-bold text-slate-800">연간 순소득금액 (순이익)</span>
+                            <span id="tax-year-profit" class="font-bold text-emerald-600 text-sm">0 원</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100 space-y-2.5">
+                        <div class="font-bold text-indigo-900 border-b border-indigo-200/60 pb-1.5 flex justify-between items-center">
+                            <span><i class="fa-solid fa-file-invoice-dollar text-indigo-600 mr-1"></i> 종합소득세 (5월 신고)</span>
+                            <span id="cit-rate-badge" class="text-[10px] bg-indigo-200 text-indigo-800 font-bold px-2 py-0.5 rounded">세율 -%</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600">예상 과세표준 (기본공제 반영)</span>
+                            <span id="cit-tax-base" class="font-medium text-slate-800">0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600">산출세액 (누진공제 차감)</span>
+                            <span id="cit-calculated-tax" class="font-medium text-slate-800">0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-indigo-200/60">
+                            <span class="font-bold text-indigo-950">예상 종합소득세 (지방세 포함)</span>
+                            <span id="cit-final-tax" class="font-bold text-indigo-700 text-sm">0 원</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-teal-50/60 p-4 rounded-xl border border-teal-100 space-y-2.5">
+                        <div class="font-bold text-teal-900 border-b border-teal-200/60 pb-1.5 flex justify-between items-center">
+                            <span><i class="fa-solid fa-percent text-teal-600 mr-1"></i> 부가가치세 (1/7월 신고)</span>
+                            <span class="text-[10px] bg-teal-200 text-teal-800 font-bold px-2 py-0.5 rounded">일반과세 10%</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600">매출 세액 (10%)</span>
+                            <span id="vat-output-tax" class="font-medium text-slate-800">0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="text-slate-600">매입 공제 세액 (증빙분 추정)</span>
+                            <span id="vat-input-tax" class="font-medium text-rose-600">- 0 원</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-teal-200/60">
+                            <span class="font-bold text-teal-950">예상 부가가치세 납부액</span>
+                            <span id="vat-final-tax" class="font-bold text-teal-700 text-sm">0 원</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-column text-blue-600"></i> 월별 수입 vs 지출 vs 마진 추이
+                    </h3>
+                    <div class="h-56 sm:h-64 relative">
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                    <h3 class="text-xs sm:text-sm font-bold text-slate-900 mb-3 flex items-center gap-1.5">
+                        <i class="fa-solid fa-chart-pie text-emerald-600"></i> 순이익 배분 비중 (유보금/대표/파트너)
+                    </h3>
+                    <div class="h-56 sm:h-64 relative flex justify-center items-center">
+                        <canvas id="marginAllocationChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 과세기준표 -->
+            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 space-y-3">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 border-b pb-3">
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                            <i class="fa-solid fa-table-cells text-indigo-600"></i> 대한민국 소득세법 과세기준표 및 구간별 최소~최대 산출세액 현황
+                        </h4>
+                        <p class="text-xs text-slate-500 mt-0.5">각 과세표준 구간별로 해당 구간에서 발생할 수 있는 산출세액 범위(최소~최대)와 현재 내 순소득 위치를 안내합니다.</p>
+                    </div>
+                    <div id="next-tier-notice" class="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-lg">
+                        다음 세율 구간 안내 계산 중...
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left bg-white rounded-lg border overflow-hidden">
+                        <thead class="bg-slate-100 text-slate-700 font-semibold border-b">
+                            <tr>
+                                <th class="p-2.5">과세표준 구간</th>
+                                <th class="p-2.5">세율</th>
+                                <th class="p-2.5">누진공제액</th>
+                                <th class="p-2.5">구간별 최소 ~ 최대 산출세액 범위</th>
+                                <th class="p-2.5 text-center">현재 위치</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tax-bracket-table-body" class="divide-y divide-slate-100">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 1: 사업내용 -->
+        <div id="content-projects" class="hidden space-y-5">
+            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3 sm:mb-4">
+                    <h2 id="project-form-title" class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus-circle text-blue-600"></i> 신규 사업 등록
+                    </h2>
+                    <button type="button" id="p-cancel-btn" onclick="cancelProjectEdit()" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1 rounded transition">
+                        취소
+                    </button>
+                </div>
+                <form id="project-form" onsubmit="handleProjectSubmit(event)" class="grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs sm:text-sm">
+                    <input type="hidden" id="p-edit-id" value="">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">사업명 *</label>
+                        <input type="text" id="p-name" required placeholder="예: 모두의창업 행사" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">정산 연월 *</label>
+                        <input type="month" id="p-month" min="2000-01" max="2099-12" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">파트너 지급예정일 <span class="text-slate-400 font-normal">(선택)</span></label>
+                        <input type="date" id="p-partner-date" min="2000-01-01" max="2099-12-31" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">계약금액 (공급가) *</label>
+                        <input type="number" id="p-amount" required placeholder="원 단위" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <!-- 발주사 및 담당자 분리 -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">발주사</label>
+                        <input type="text" id="p-client" placeholder="예: 제이원창업투자" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">담당자명</label>
+                        <input type="text" id="p-contact-person" placeholder="예: 홍길동 팀장" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">담당자 연락처</label>
+                        <input type="text" id="p-contact-phone" placeholder="010-0000-0000" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">담당자 이메일</label>
+                        <input type="text" id="p-contact-email" placeholder="email@company.com" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">회사 유보율 (0~100%) *</label>
+                        <select id="p-reserve" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="0">0% (전액 배분)</option>
+                            <option value="0.1">10%</option>
+                            <option value="0.2">20%</option>
+                            <option value="0.3" selected>30%</option>
+                            <option value="0.4">40%</option>
+                            <option value="0.5">50%</option>
+                            <option value="0.6">60%</option>
+                            <option value="0.7">70%</option>
+                            <option value="0.8">80%</option>
+                            <option value="0.9">90%</option>
+                            <option value="1.0">100% (전액 회사유보)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">수익분배비율 (대표 : 파트너) *</label>
+                        <select id="p-split" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                            <option value="1.0">100 : 0 (대표 전액 독점)</option>
+                            <option value="0.9">90 : 10</option>
+                            <option value="0.8">80 : 20</option>
+                            <option value="0.7">70 : 30</option>
+                            <option value="0.6">60 : 40</option>
+                            <option value="0.5" selected>50 : 50 (대표=파트너 세후 동액)</option>
+                            <option value="0.4">40 : 60</option>
+                            <option value="0.3">30 : 70</option>
+                            <option value="0.2">20 : 80</option>
+                            <option value="0.1">10 : 90</option>
+                            <option value="0.0">0 : 100 (파트너 전액 독점)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">파트너 원천세율 *</label>
+                        <select id="p-partner-tax-rate" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white font-bold text-indigo-700">
+                            <option value="0.033" selected>3.3% (사업소득)</option>
+                            <option value="0.088">8.8% (기타소득)</option>
+                        </select>
+                    </div>
+
+                    <div class="sm:col-span-5 flex items-center pt-5">
+                        <label class="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded-lg border border-slate-200 w-full">
+                            <input type="checkbox" id="p-completed" class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500 cursor-pointer">
+                            <span class="text-xs font-semibold text-slate-800">이 사업 완료(종료) 처리 (체크 시 신규 지출 등록 목록에서 제외 및 To-Do 아카이브 폴더로 이동)</span>
+                        </label>
+                    </div>
+
+                    <div class="sm:col-span-6">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">메모</label>
+                        <input type="text" id="p-memo" placeholder="비고 및 메모" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                    </div>
+
+                    <div class="sm:col-span-6 flex justify-end pt-1">
+                        <button type="submit" id="p-submit-btn" class="w-full sm:w-48 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-lg transition shadow-sm">
+                            사업 등록하기
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="project-list-container" class="space-y-3">
+            </div>
+        </div>
+
+        <!-- TAB 2: 지출 상세 내역 -->
+        <div id="content-expenses" class="hidden space-y-5">
+            <div id="expense-filter-banner" class="hidden bg-blue-50 border border-blue-200 p-3 rounded-xl justify-between items-center text-xs sm:text-sm">
+                <div class="flex items-center gap-1.5 text-blue-900 font-semibold">
+                    <i class="fa-solid fa-filter text-blue-600"></i>
+                    <span>[<span id="filter-project-name" class="underline"></span>] 지출 조회 중</span>
+                </div>
+                <button type="button" onclick="clearExpenseFilter()" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded transition">
+                    전체보기
+                </button>
+            </div>
+
+            <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                <div class="flex justify-between items-center mb-3 sm:mb-4">
+                    <h2 id="expense-form-title" class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-1.5">
+                        <i class="fa-solid fa-plus-circle text-teal-600"></i> 신규 지출 / 지급예정 등록
+                    </h2>
+                    <button type="button" id="e-cancel-btn" onclick="cancelExpenseEdit()" class="hidden text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 px-2.5 py-1 rounded transition">
+                        취소
+                    </button>
+                </div>
+                <form id="expense-form" onsubmit="handleExpenseSubmit(event)" class="grid grid-cols-1 sm:grid-cols-6 gap-3 text-xs sm:text-sm">
+                    <input type="hidden" id="e-edit-id" value="">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">관련 사업 (진행중인 사업만 표시) *</label>
+                        <select id="e-project" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">지급(예정)일자 *</label>
+                        <input type="date" id="e-date" min="2000-01-01" max="2099-12-31" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">지출 비목</label>
+                        <input type="text" id="e-category" placeholder="예: 강의료, 대관료" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">지급 업체 / 강사명 *</label>
+                        <input type="text" id="e-vendor" required placeholder="예: 최예지 강사" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">지출 금액 (VAT포함) *</label>
+                        <input type="number" id="e-amount" required placeholder="원 단위" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">증빙 구분 *</label>
+                        <select id="e-proof" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+                            <option value="원천징수" selected>원천징수</option>
+                            <option value="세금계산서">세금계산서</option>
+                            <option value="현금영수증">현금영수증</option>
+                            <option value="카드결제">카드결제</option>
+                            <option value="간이영수증/기타">간이영수증/기타</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">진행 상태 *</label>
+                        <select id="e-status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none bg-white">
+                            <option value="지급예정" selected>⏳ 지급예정</option>
+                            <option value="발주">발주</option>
+                            <option value="배송중">배송중</option>
+                            <option value="배송완료">배송완료</option>
+                            <option value="예약완료">예약완료</option>
+                            <option value="지급완료">지급완료</option>
+                        </select>
+                    </div>
+                    
+                    <div class="sm:col-span-3 bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="e-tax-target" onchange="toggleTaxRateSelect()" class="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 cursor-pointer">
+                            <label for="e-tax-target" class="text-xs font-semibold text-amber-900 cursor-pointer select-none">
+                                원천세 납부 대상 (외부 지출용)
+                            </label>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-[11px] font-medium text-slate-700">세율:</span>
+                            <select id="e-tax-rate" disabled class="px-2 py-1 text-xs border rounded bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none disabled:bg-slate-100 disabled:text-slate-400">
+                                <option value="0.033" selected>3.3% (사업소득)</option>
+                                <option value="0.088">8.8% (기타소득)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="sm:col-span-3">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">메모</label>
+                        <input type="text" id="e-memo" placeholder="메모 기록" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+
+                    <div class="sm:col-span-6 flex justify-end pt-1">
+                        <button type="submit" id="e-submit-btn" class="w-full sm:w-48 bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg transition shadow-sm">
+                            지출 등록하기
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="expense-list-container" class="space-y-3">
+            </div>
+        </div>
+
+        <!-- TAB 3: 월별 요약 -->
+        <div id="content-summary" class="hidden space-y-5">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                <h2 class="text-sm sm:text-base font-bold text-slate-900 mb-3">월별 통합 집계 요약 (지급예정 포함)</h2>
+                <div id="summary-list-container" class="overflow-x-auto">
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: To-Do 업무 관리 -->
+        <div id="content-todo" class="hidden space-y-5">
+            <div id="todo-step-project-select" class="space-y-5">
+                <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200">
+                    <div class="flex items-center gap-3 mb-1">
+                        <div class="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-lg">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-base sm:text-lg font-bold text-slate-900">To-Do 업무관리 - 사업 선택</h2>
+                            <p class="text-xs text-slate-500">진행 중인 사업 목록입니다. 업무 카드를 조회/작성할 사업을 선택하세요.</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- 진행 중인 사업 카드 그리드 -->
+                <div id="todo-project-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                </div>
+
+                <!-- 완료된 사업 아카이브 폴더 섹션 -->
+                <div id="todo-completed-folder-section" class="bg-slate-100 p-4 rounded-xl border border-slate-200 space-y-3 mt-6">
+                    <div onclick="toggleCompletedArchiveFolder()" class="flex justify-between items-center cursor-pointer select-none">
+                        <div class="flex items-center gap-2 font-bold text-slate-700 text-sm">
+                            <i class="fa-solid fa-folder-closed text-amber-500" id="archive-folder-icon"></i>
+                            <span>완료된 사업 아카이브 폴더 (<span id="completed-project-count">0</span>)</span>
+                        </div>
+                        <span class="text-xs text-indigo-600 font-semibold hover:underline" id="archive-folder-toggle-text">열기 ▼</span>
+                    </div>
+                    <div id="todo-completed-folder-content" class="hidden space-y-2 pt-2 border-t border-slate-200">
+                    </div>
+                </div>
+            </div>
+
+            <div id="todo-step-kanban-board" class="hidden space-y-5">
+                <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div class="flex items-center gap-3">
+                        <button type="button" onclick="backToTodoProjectList()" class="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition shadow-sm" title="사업 목록으로 돌아가기">
+                            <i class="fa-solid fa-arrow-left"></i>
+                        </button>
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h2 id="todo-board-title" class="text-base sm:text-lg font-bold text-slate-900">모두의창업 네트워크 행사</h2>
+                                <span id="todo-board-month-badge" class="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded">2026-11</span>
+                            </div>
+                            <p id="todo-board-subtitle" class="text-xs text-slate-500">해당 사업의 업무 진행 상태 및 마감일(D-Day)을 공유 및 기록합니다.</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button type="button" onclick="openTodoModal(null, '시작 전')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                            <i class="fa-solid fa-plus"></i> 새 업무 만들기
+                        </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
+                    <div class="bg-slate-100/70 p-3.5 rounded-xl border border-slate-200/80 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between mb-3 px-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+                                <h3 class="font-bold text-slate-700 text-sm">시작 전</h3>
+                                <span id="count-todo-start" class="text-xs font-bold text-slate-500 bg-slate-200 px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                        </div>
+                        <div id="column-todo-start" class="space-y-3 flex-1 overflow-y-auto no-scrollbar pb-2"></div>
+                        <button type="button" onclick="openTodoModal(null, '시작 전')" class="mt-2 w-full py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold rounded-lg text-center transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-plus text-slate-400"></i> 새 업무 추가
+                        </button>
+                    </div>
+
+                    <div class="bg-sky-50/50 p-3.5 rounded-xl border border-sky-100 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between mb-3 px-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-sky-500"></span>
+                                <h3 class="font-bold text-sky-900 text-sm">진행 중</h3>
+                                <span id="count-todo-progress" class="text-xs font-bold text-sky-700 bg-sky-100 px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                        </div>
+                        <div id="column-todo-progress" class="space-y-3 flex-1 overflow-y-auto no-scrollbar pb-2"></div>
+                        <button type="button" onclick="openTodoModal(null, '진행 중')" class="mt-2 w-full py-2 bg-white hover:bg-sky-50 border border-sky-200 text-sky-700 text-xs font-semibold rounded-lg text-center transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-plus text-sky-400"></i> 새 업무 추가
+                        </button>
+                    </div>
+
+                    <div class="bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-100 flex flex-col min-h-[500px]">
+                        <div class="flex items-center justify-between mb-3 px-1">
+                            <div class="flex items-center gap-2">
+                                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                <h3 class="font-bold text-emerald-900 text-sm">Done</h3>
+                                <span id="count-todo-done" class="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">0</span>
+                            </div>
+                        </div>
+                        <div id="column-todo-done" class="space-y-3 flex-1 overflow-y-auto no-scrollbar pb-2"></div>
+                        <button type="button" onclick="openTodoModal(null, 'Done')" class="mt-2 w-full py-2 bg-white hover:bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-lg text-center transition flex items-center justify-center gap-1">
+                            <i class="fa-solid fa-plus text-emerald-400"></i> 새 업무 추가
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- To-Do 카드 모달 -->
+    <div id="todo-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex justify-center items-center p-4 overflow-y-auto">
+        <div class="bg-white w-full max-w-lg rounded-xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all my-8">
+            <div class="bg-slate-900 text-white px-5 py-4 flex justify-between items-center">
+                <h3 id="todo-modal-title" class="font-bold text-base flex items-center gap-2">
+                    <i class="fa-solid fa-list-check text-indigo-400"></i> 업무 상세 내용
+                </h3>
+                <button type="button" onclick="closeTodoModal()" class="text-slate-400 hover:text-white transition">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form id="todo-form" onsubmit="handleTodoSubmit(event)" class="p-5 space-y-4 text-xs sm:text-sm">
+                <input type="hidden" id="todo-id" value="">
+                
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">관련 사업 *</label>
+                    <select id="todo-project-id" required class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">업무 제목 *</label>
+                    <input type="text" id="todo-title" required placeholder="예: 현장물품 구매, 대금입금 확인" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">진행 상태 *</label>
+                        <select id="todo-status" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white font-bold">
+                            <option value="시작 전">⚪ 시작 전</option>
+                            <option value="진행 중">🔵 진행 중</option>
+                            <option value="Done">🟢 Done (완료)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">우선순위</label>
+                        <select id="todo-priority" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none bg-white">
+                            <option value="보통" selected>보통</option>
+                            <option value="높음">🔥 높음</option>
+                            <option value="낮음">낮음</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">업무 마감일자 (Due Date)</label>
+                        <input type="date" id="todo-due-date" min="2000-01-01" max="2099-12-31" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-700 mb-1">담당자 (쉼표로 구분)</label>
+                        <input type="text" id="todo-assignee" placeholder="예: 박지훈, 이슬" class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-semibold text-slate-700 mb-1">상세 업무 내용 및 기록</label>
+                    <textarea id="todo-desc" rows="4" placeholder="업무 요청사항, 전달 내용, 진행 경과 등을 자유롭게 기록하세요." class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-3 border-t">
+                    <button type="button" id="todo-delete-btn" onclick="deleteTodoFromModal()" class="hidden text-rose-600 hover:text-rose-800 font-semibold text-xs px-2 py-1 rounded bg-rose-50 hover:bg-rose-100 transition">
+                        <i class="fa-solid fa-trash mr-1"></i> 삭제
+                    </button>
+                    <div class="flex gap-2 ml-auto">
+                        <button type="button" onclick="closeTodoModal()" class="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium rounded-lg transition">
+                            취소
+                        </button>
+                        <button type="submit" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition shadow-sm">
+                            저장하기
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // 사용자 구글 시트 웹 앱 API URL 연동
+        const API_URL = "https://script.google.com/macros/s/AKfycbwcCa4IlGqMKTxggukE-nQdeB8IfcmuCNxdW4hL4ODlUGkaF1JS8NGmzgE7tAfnEkyC/exec";
+
+        let projects = [];
+        let expenses = [];
+        let todos = [];
+
+        let selectedProjectIdFilter = null;
+        let currentTodoSelectedProjectId = null;
+        let monthlyChart = null;
+        let pieChart = null;
+        let isArchiveFolderOpen = false;
+
+        // 구글 시트로부터 데이터 비동기 로드
+        async function loadDataFromCloud() {
+            try {
+                const response = await fetch(`${API_URL}?action=getData`);
+                const result = await response.json();
+                
+                if (result.projects && result.projects.length > 0) {
+                    projects = result.projects.map(p => ({ 
+                        ...p, 
+                        id: Number(p.id), 
+                        partnerDate: p.partnerDate || '', 
+                        reserve: Number(p.reserve), 
+                        split: Number(p.split), 
+                        partnerTaxRate: Number(p.partnerTaxRate), 
+                        isCompleted: Boolean(p.isCompleted),
+                        client: p.client || '',
+                        contactPerson: p.contactPerson || '',
+                        contactPhone: p.contactPhone || '',
+                        contactEmail: p.contactEmail || ''
+                    }));
+                } else {
+                    projects = [];
+                }
+
+                if (result.expenses && result.expenses.length > 0) {
+                    expenses = result.expenses.map(e => ({ 
+                        ...e, 
+                        id: Number(e.id), 
+                        projectId: Number(e.projectId), 
+                        amount: Number(e.amount), 
+                        isWithholdingTax: Boolean(e.isWithholdingTax), 
+                        taxRate: Number(e.taxRate) 
+                    }));
+                } else {
+                    expenses = [];
+                }
+
+                if (result.todos && result.todos.length > 0) {
+                    todos = result.todos.map(t => ({ 
+                        ...t, 
+                        id: Number(t.id), 
+                        projectId: Number(t.projectId) 
+                    }));
+                } else {
+                    todos = [];
+                }
+
+                renderAll();
+            } catch (err) {
+                console.error("데이터 로드 실패:", err);
+                alert("구글 시트에서 데이터를 불러오지 못했습니다. 네트워크 상태나 웹 앱 배포 설정을 확인해주세요.");
+            }
+        }
+
+        // 구글 시트에 데이터 동기화 저장
+        async function saveData() {
+            const validIds = new Set(projects.map(p => Number(p.id)));
+            todos = todos.filter(t => t && t.projectId && validIds.has(Number(t.projectId)));
+
+            try {
+                await fetch(API_URL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "saveAll",
+                        projects: projects,
+                        expenses: expenses,
+                        todos: todos
+                    })
+                });
+            } catch (err) {
+                console.error("저장 실패:", err);
+            }
+            renderAll();
+        }
+
+        function exportData() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({ projects, expenses, todos, exportDate: new Date().toISOString() }, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `내일가치연구소_정산백업_${new Date().toISOString().slice(0,10)}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (imported.projects && imported.expenses) {
+                        if (confirm("기존 데이터에 백업 데이터를 복원하시겠습니까?")) {
+                            projects = imported.projects.map(p => ({ 
+                                ...p, 
+                                id: Number(p.id), 
+                                partnerDate: p.partnerDate || '', 
+                                reserve: Number(p.reserve), 
+                                split: Number(p.split), 
+                                partnerTaxRate: p.partnerTaxRate ? Number(p.partnerTaxRate) : 0.033, 
+                                isCompleted: Boolean(p.isCompleted),
+                                client: p.client || '',
+                                contactPerson: p.contactPerson || '',
+                                contactPhone: p.contactPhone || '',
+                                contactEmail: p.contactEmail || ''
+                            }));
+                            expenses = imported.expenses.map(ex => ({ ...ex, id: Number(ex.id), projectId: Number(ex.projectId), amount: Number(ex.amount), isWithholdingTax: Boolean(ex.isWithholdingTax), taxRate: ex.taxRate ? Number(ex.taxRate) : 0.033 }));
+                            if (imported.todos) {
+                                const validIds = new Set(projects.map(p => Number(p.id)));
+                                todos = imported.todos.filter(t => t && t.projectId && validIds.has(Number(t.projectId))).map(t => ({ ...t, id: Number(t.id), projectId: Number(t.projectId), dueDate: t.dueDate || '' }));
+                            }
+                            saveData();
+                            alert("복원 완료!");
+                        }
+                    }
+                } catch (err) { alert("파일 형식 오류"); }
+            };
+            reader.readAsText(file);
+        }
+
+        function formatKW(val) {
+            return new Intl.NumberFormat('ko-KR').format(Math.round(val || 0)) + ' 원';
+        }
+
+        function getDDayInfo(dueDateStr) {
+            if (!dueDateStr) return { text: '마감일 미정', badgeClass: 'bg-slate-100 text-slate-600 border-slate-200', days: 9999 };
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const due = new Date(dueDateStr);
+            due.setHours(0,0,0,0);
+            const diffDays = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            if (diffDays < 0) return { text: `D+${Math.abs(diffDays)} (지연)`, badgeClass: 'bg-rose-100 text-rose-800 border-rose-300 font-bold', days: diffDays };
+            if (diffDays === 0) return { text: 'D-Day (오늘)', badgeClass: 'bg-amber-500 text-white font-bold animate-pulse', days: 0 };
+            if (diffDays <= 3) return { text: `D-${diffDays}`, badgeClass: 'bg-orange-100 text-orange-800 border-orange-300 font-bold', days: diffDays };
+            return { text: `D-${diffDays}`, badgeClass: 'bg-blue-50 text-blue-700 border-blue-200', days: diffDays };
+        }
+
+        function switchTab(tab, specificProjectId = null) {
+            ['dashboard', 'projects', 'expenses', 'summary', 'todo'].forEach(t => {
+                const el = document.getElementById(`content-${t}`);
+                const btn = document.getElementById(`tab-${t}`);
+                if (el) el.classList.add('hidden');
+                if (btn) btn.classList.remove('tab-active');
+            });
+
+            const targetContent = document.getElementById(`content-${tab}`);
+            const targetTab = document.getElementById(`tab-${tab}`);
+            if (targetContent) targetContent.classList.remove('hidden');
+            if (targetTab) targetTab.classList.add('tab-active');
+
+            if (tab === 'expenses') {
+                selectedProjectIdFilter = null;
+                renderExpenses();
+            }
+            if (tab === 'todo') {
+                if (specificProjectId !== null && specificProjectId !== undefined) {
+                    currentTodoSelectedProjectId = Number(specificProjectId);
+                }
+                renderTodoTabContent();
+            }
+            if (tab === 'dashboard') {
+                renderDashboardCharts();
+            }
+        }
+
+        function viewProjectExpenses(projectId) {
+            selectedProjectIdFilter = Number(projectId);
+            switchTab('expenses');
+            renderExpenses();
+        }
+
+        function viewProjectTodos(projectId) {
+            switchTab('todo', projectId);
+        }
+
+        function backToTodoProjectList() {
+            currentTodoSelectedProjectId = null;
+            renderTodoTabContent();
+        }
+
+        function clearExpenseFilter() {
+            selectedProjectIdFilter = null;
+            renderExpenses();
+        }
+
+        function toggleTaxRateSelect() {
+            const isChecked = document.getElementById('e-tax-target').checked;
+            document.getElementById('e-tax-rate').disabled = !isChecked;
+        }
+
+        function toggleProjectCompleted(id) {
+            const proj = projects.find(p => p.id === Number(id));
+            if (proj) {
+                proj.isCompleted = !proj.isCompleted;
+                saveData();
+            }
+        }
+
+        function handleProjectSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('p-edit-id').value;
+            const projData = {
+                name: document.getElementById('p-name').value,
+                month: document.getElementById('p-month').value,
+                partnerDate: document.getElementById('p-partner-date').value || '',
+                client: document.getElementById('p-client').value,
+                contactPerson: document.getElementById('p-contact-person').value,
+                contactPhone: document.getElementById('p-contact-phone').value,
+                contactEmail: document.getElementById('p-contact-email').value,
+                memo: document.getElementById('p-memo').value,
+                amount: parseFloat(document.getElementById('p-amount').value) || 0,
+                reserve: parseFloat(document.getElementById('p-reserve').value) || 0.3,
+                split: parseFloat(document.getElementById('p-split').value) || 0.5,
+                partnerTaxRate: parseFloat(document.getElementById('p-partner-tax-rate').value) || 0.033,
+                isCompleted: document.getElementById('p-completed').checked
+            };
+
+            if (editId) {
+                const idx = projects.findIndex(p => p.id === Number(editId));
+                if (idx !== -1) {
+                    projects[idx] = { ...projects[idx], ...projData };
+                }
+                cancelProjectEdit();
+            } else {
+                const newId = projects.length > 0 ? Math.max(...projects.map(p => p.id)) + 1 : 1;
+                projects.push({ id: newId, ...projData });
+                document.getElementById('project-form').reset();
+                document.getElementById('p-reserve').value = "0.3";
+                document.getElementById('p-split').value = "0.5";
+                document.getElementById('p-partner-tax-rate').value = "0.033";
+            }
+            saveData();
+        }
+
+        function editProject(id) {
+            const p = projects.find(item => item.id === Number(id));
+            if (!p) return;
+            document.getElementById('p-edit-id').value = p.id;
+            document.getElementById('p-name').value = p.name;
+            document.getElementById('p-month').value = p.month;
+            document.getElementById('p-partner-date').value = p.partnerDate || '';
+            document.getElementById('p-client').value = p.client || '';
+            document.getElementById('p-contact-person').value = p.contactPerson || '';
+            document.getElementById('p-contact-phone').value = p.contactPhone || '';
+            document.getElementById('p-contact-email').value = p.contactEmail || '';
+            document.getElementById('p-memo').value = p.memo || '';
+            document.getElementById('p-amount').value = p.amount;
+            document.getElementById('p-reserve').value = p.reserve;
+            document.getElementById('p-split').value = p.split;
+            document.getElementById('p-partner-tax-rate').value = p.partnerTaxRate || 0.033;
+            document.getElementById('p-completed').checked = p.isCompleted;
+
+            document.getElementById('project-form-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-blue-600"></i> 사업 수정 중 (ID: ' + p.id + ')';
+            document.getElementById('p-submit-btn').innerText = '수정 완료하기';
+            document.getElementById('p-cancel-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelProjectEdit() {
+            document.getElementById('project-form').reset();
+            document.getElementById('p-edit-id').value = '';
+            document.getElementById('p-reserve').value = "0.3";
+            document.getElementById('p-split').value = "0.5";
+            document.getElementById('p-partner-tax-rate').value = "0.033";
+            document.getElementById('project-form-title').innerHTML = '<i class="fa-solid fa-plus-circle text-blue-600"></i> 신규 사업 등록';
+            document.getElementById('p-submit-btn').innerText = '사업 등록하기';
+            document.getElementById('p-cancel-btn').classList.add('hidden');
+        }
+
+        function deleteProject(id) {
+            if (confirm("정말 이 사업을 삭제하시겠습니까? 연결된 지출 및 업무 데이터도 함께 정리됩니다.")) {
+                projects = projects.filter(p => p.id !== Number(id));
+                expenses = expenses.filter(e => e.projectId !== Number(id));
+                todos = todos.filter(t => t.projectId !== Number(id));
+                saveData();
+            }
+        }
+
+        function handleExpenseSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('e-edit-id').value;
+            const isTaxTarget = document.getElementById('e-tax-target').checked;
+            const expData = {
+                projectId: parseInt(document.getElementById('e-project').value),
+                date: document.getElementById('e-date').value,
+                category: document.getElementById('e-category').value,
+                vendor: document.getElementById('e-vendor').value,
+                amount: parseFloat(document.getElementById('e-amount').value) || 0,
+                proof: document.getElementById('e-proof').value,
+                status: document.getElementById('e-status').value,
+                isWithholdingTax: isTaxTarget,
+                taxRate: isTaxTarget ? parseFloat(document.getElementById('e-tax-rate').value) : 0.033,
+                memo: document.getElementById('e-memo').value
+            };
+
+            if (editId) {
+                const idx = expenses.findIndex(ex => ex.id === Number(editId));
+                if (idx !== -1) {
+                    expenses[idx] = { ...expenses[idx], ...expData };
+                }
+                cancelExpenseEdit();
+            } else {
+                const newId = expenses.length > 0 ? Math.max(...expenses.map(ex => ex.id)) + 1 : 1;
+                expenses.push({ id: newId, ...expData });
+                document.getElementById('expense-form').reset();
+                document.getElementById('e-tax-rate').disabled = true;
+            }
+            saveData();
+        }
+
+        function editExpense(id) {
+            const ex = expenses.find(item => item.id === Number(id));
+            if (!ex) return;
+            document.getElementById('e-edit-id').value = ex.id;
+            document.getElementById('e-project').value = ex.projectId;
+            document.getElementById('e-date').value = ex.date;
+            document.getElementById('e-category').value = ex.category || '';
+            document.getElementById('e-vendor').value = ex.vendor;
+            document.getElementById('e-amount').value = ex.amount;
+            document.getElementById('e-proof').value = ex.proof;
+            document.getElementById('e-status').value = ex.status;
+            document.getElementById('e-memo').value = ex.memo || '';
+            
+            const taxTargetCheckbox = document.getElementById('e-tax-target');
+            taxTargetCheckbox.checked = ex.isWithholdingTax;
+            const taxRateSelect = document.getElementById('e-tax-rate');
+            taxRateSelect.disabled = !ex.isWithholdingTax;
+            taxRateSelect.value = ex.taxRate || 0.033;
+
+            document.getElementById('expense-form-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-teal-600"></i> 지출 수정 중';
+            document.getElementById('e-submit-btn').innerText = '지출 수정 완료';
+            document.getElementById('e-cancel-btn').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelExpenseEdit() {
+            document.getElementById('expense-form').reset();
+            document.getElementById('e-edit-id').value = '';
+            document.getElementById('e-tax-rate').disabled = true;
+            document.getElementById('expense-form-title').innerHTML = '<i class="fa-solid fa-plus-circle text-teal-600"></i> 신규 지출 / 지급예정 등록';
+            document.getElementById('e-submit-btn').innerText = '지출 등록하기';
+            document.getElementById('e-cancel-btn').classList.add('hidden');
+        }
+
+        function deleteExpense(id) {
+            if (confirm("이 지출 내역을 삭제하시겠습니까?")) {
+                expenses = expenses.filter(ex => ex.id !== Number(id));
+                saveData();
+            }
+        }
+
+        function handleTodoSubmit(e) {
+            e.preventDefault();
+            const editId = document.getElementById('todo-id').value;
+            const todoData = {
+                projectId: parseInt(document.getElementById('todo-project-id').value),
+                title: document.getElementById('todo-title').value,
+                status: document.getElementById('todo-status').value,
+                priority: document.getElementById('todo-priority').value,
+                dueDate: document.getElementById('todo-due-date').value || '',
+                assignee: document.getElementById('todo-assignee').value,
+                desc: document.getElementById('todo-desc').value
+            };
+
+            if (editId) {
+                const idx = todos.findIndex(t => t.id === Number(editId));
+                if (idx !== -1) {
+                    todos[idx] = { ...todos[idx], ...todoData };
+                }
+            } else {
+                const newId = todos.length > 0 ? Math.max(...todos.map(t => t.id)) + 1 : 101;
+                todos.push({ id: newId, ...todoData });
+            }
+            closeTodoModal();
+            saveData();
+        }
+
+        function openTodoModal(todoId = null, defaultStatus = '시작 전') {
+            const modal = document.getElementById('todo-modal');
+            const projectSelect = document.getElementById('todo-project-id');
+            projectSelect.innerHTML = projects.filter(p => !p.isCompleted).map(p => `<option value="${p.id}">${p.name} (${p.month})</option>`).join('');
+
+            if (currentTodoSelectedProjectId !== null) {
+                projectSelect.value = currentTodoSelectedProjectId;
+            }
+
+            if (todoId) {
+                const t = todos.find(item => item.id === Number(todoId));
+                if (t) {
+                    document.getElementById('todo-id').value = t.id;
+                    projectSelect.value = t.projectId;
+                    document.getElementById('todo-title').value = t.title;
+                    document.getElementById('todo-status').value = t.status;
+                    document.getElementById('todo-priority').value = t.priority || '보통';
+                    document.getElementById('todo-due-date').value = t.dueDate || '';
+                    document.getElementById('todo-assignee').value = t.assignee || '';
+                    document.getElementById('todo-desc').value = t.desc || '';
+                    document.getElementById('todo-modal-title').innerHTML = '<i class="fa-solid fa-pen-to-square text-indigo-400"></i> 업무 카드 수정';
+                    document.getElementById('todo-delete-btn').classList.remove('hidden');
+                }
+            } else {
+                document.getElementById('todo-id').value = '';
+                document.getElementById('todo-title').value = '';
+                document.getElementById('todo-status').value = defaultStatus;
+                document.getElementById('todo-priority').value = '보통';
+                document.getElementById('todo-due-date').value = '';
+                document.getElementById('todo-assignee').value = '';
+                document.getElementById('todo-desc').value = '';
+                document.getElementById('todo-modal-title').innerHTML = '<i class="fa-solid fa-list-check text-indigo-400"></i> 새 업무 카드 작성';
+                document.getElementById('todo-delete-btn').classList.add('hidden');
+            }
+            modal.classList.remove('hidden');
+        }
+
+        function closeTodoModal() {
+            document.getElementById('todo-modal').classList.add('hidden');
+        }
+
+        function deleteTodoFromModal() {
+            const id = document.getElementById('todo-id').value;
+            if (id && confirm("이 업무 카드를 삭제하시겠습니까?")) {
+                todos = todos.filter(t => t.id !== Number(id));
+                closeTodoModal();
+                saveData();
+            }
+        }
+
+        function updateTodoStatusDirect(id, newStatus) {
+            const t = todos.find(item => item.id === Number(id));
+            if (t) {
+                t.status = newStatus;
+                saveData();
+            }
+        }
+
+        function toggleCompletedArchiveFolder() {
+            isArchiveFolderOpen = !isArchiveFolderOpen;
+            const content = document.getElementById('todo-completed-folder-content');
+            const toggleText = document.getElementById('archive-folder-toggle-text');
+            const folderIcon = document.getElementById('archive-folder-icon');
+
+            if (isArchiveFolderOpen) {
+                content.classList.remove('hidden');
+                toggleText.innerText = '닫기 ▲';
+                folderIcon.classList.remove('fa-folder-closed');
+                folderIcon.classList.add('fa-folder-open');
+            } else {
+                content.classList.add('hidden');
+                toggleText.innerText = '열기 ▼';
+                folderIcon.classList.remove('fa-folder-open');
+                folderIcon.classList.add('fa-folder-closed');
+            }
+        }
+
+        function renderAll() {
+            renderKPIs();
+            renderProjects();
+            renderExpenses();
+            renderSummary();
+            renderTaxYears();
+            renderTaxEstimates();
+            renderDashboardActiveTodos();
+            renderTaxDdayNotification();
+            if (document.getElementById('content-dashboard').classList.contains('hidden') === false) {
+                renderDashboardCharts();
+            }
+            if (document.getElementById('content-todo').classList.contains('hidden') === false) {
+                renderTodoTabContent();
+            }
+        }
+
+        function calculateCombinedTaxDue() {
+            let totalPendingTax = 0;
+            const now = new Date();
+            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
+
+            projects.forEach(p => {
+                if (p.partnerDate && p.partnerDate.slice(0,7) === currentYearMonth) {
+                    const netProfit = p.amount - expenses.filter(ex => ex.projectId === p.id).reduce((acc, cur) => acc + cur.amount, 0);
+                    if (netProfit > 0) {
+                        const afterReserve = netProfit - (netProfit * p.reserve);
+                        const taxRate = p.partnerTaxRate || 0.033;
+                        const repRatio = p.split;
+                        const partRatio = 1 - p.split;
+                        const denom = repRatio + partRatio / (1 - taxRate);
+                        const partnerGross = afterReserve * (partRatio / denom) / (1 - taxRate);
+                        totalPendingTax += partnerGross * taxRate; 
+                    }
+                }
+            });
+
+            expenses.forEach(ex => {
+                if (ex.date && ex.date.slice(0,7) === currentYearMonth && ex.isWithholdingTax) {
+                    totalPendingTax += ex.amount * (ex.taxRate || 0.033);
+                }
+            });
+
+            let totalCitVatTax = 0;
+            const currentYearStr = String(now.getFullYear());
+            const yearProjects = projects.filter(p => p.month && p.month.startsWith(currentYearStr));
+            if (yearProjects.length > 0) {
+                let rev = yearProjects.reduce((acc, cur) => acc + cur.amount, 0);
+                let exp = 0;
+                yearProjects.forEach(p => {
+                    exp += expenses.filter(ex => ex.projectId === p.id).reduce((acc, cur) => acc + cur.amount, 0);
+                });
+                let profit = rev - exp;
+                if (profit > 0) {
+                    let taxBase = Math.max(0, profit - 1500000);
+                    let cit = 0;
+                    if (taxBase <= 14000000) cit = taxBase * 0.06;
+                    else if (taxBase <= 50000000) cit = 840000 + (taxBase - 14000000) * 0.15;
+                    else if (taxBase <= 88000000) cit = 5240000 + (taxBase - 50000000) * 0.24;
+                    else if (taxBase <= 150000000) cit = 14360000 + (taxBase - 88000000) * 0.35;
+                    else cit = 36160000 + (taxBase - 150000000) * 0.38;
+                    totalCitVatTax += cit * 1.1;
+                }
+                let vatOutput = rev * 0.1;
+                let vatInput = exp * 0.05;
+                totalCitVatTax += Math.max(0, vatOutput - vatInput);
+            }
+            return totalPendingTax + totalCitVatTax;
+        }
+
+        function renderKPIs() {
+            let totalContract = 0;
+            let totalExpense = 0;
+            let totalReserve = 0;
+            let totalPayout = 0;
+
+            projects.forEach(p => {
+                totalContract += p.amount;
+                const pExps = expenses.filter(ex => ex.projectId === p.id);
+                const sumExp = pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                totalExpense += sumExp;
+
+                const netProfit = p.amount - sumExp;
+                if (netProfit > 0) {
+                    const reserveAmt = netProfit * p.reserve;
+                    const afterReserve = netProfit - reserveAmt;
+                    const taxRate = p.partnerTaxRate || 0.033;
+                    const repRatio = p.split;
+                    const partRatio = 1 - p.split;
+                    const denom = repRatio + partRatio / (1 - taxRate);
+                    const repShare = afterReserve * (repRatio / denom);
+                    totalReserve += reserveAmt;
+                    totalPayout += repShare;
+                }
+            });
+
+            const combinedTaxDue = calculateCombinedTaxDue();
+            const netReserve = totalReserve - combinedTaxDue;
+
+            document.getElementById('kpi-total-contract').innerText = formatKW(totalContract);
+            document.getElementById('kpi-total-expense').innerText = formatKW(totalExpense);
+            document.getElementById('kpi-total-reserve').innerText = formatKW(totalReserve);
+            document.getElementById('kpi-pending-tax').innerText = formatKW(combinedTaxDue);
+            document.getElementById('kpi-net-reserve').innerText = formatKW(netReserve);
+            document.getElementById('kpi-total-payout').innerText = formatKW(totalPayout);
+        }
+
+        function renderProjects() {
+            const container = document.getElementById('project-list-container');
+            const selectEl = document.getElementById('e-project');
+
+            let activeProjectsOptions = projects.filter(p => !p.isCompleted);
+            if (activeProjectsOptions.length === 0) {
+                selectEl.innerHTML = '<option value="">진행중인 사업 없음 (사업내용에서 완료 해제 필요)</option>';
+            } else {
+                selectEl.innerHTML = activeProjectsOptions.map(p => `<option value="${p.id}">${p.name} (${p.month})</option>`).join('');
+            }
+
+            if (projects.length === 0) {
+                container.innerHTML = '<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-xs sm:text-sm border">등록된 사업이 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = projects.map(p => {
+                const pExps = expenses.filter(ex => ex.projectId === p.id);
+                const sumExp = pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                const netProfit = p.amount - sumExp;
+                const reserveAmt = netProfit > 0 ? netProfit * p.reserve : 0;
+                const afterReserve = netProfit > 0 ? netProfit - reserveAmt : 0;
+                
+                const taxRate = p.partnerTaxRate || 0.033;
+                const repRatio = p.split;
+                const partRatio = 1 - p.split;
+                
+                let repShare = 0;
+                let partnerGross = 0;
+                let partnerTax = 0;
+                let partnerNet = 0;
+
+                if (afterReserve > 0) {
+                    const denom = repRatio + partRatio / (1 - taxRate);
+                    repShare = afterReserve * (repRatio / denom);
+                    partnerNet = afterReserve * (partRatio / denom);
+                    partnerGross = partnerNet / (1 - taxRate);
+                    partnerTax = partnerGross * taxRate;
+                }
+
+                const completedBadge = p.isCompleted 
+                    ? '<span class="bg-slate-200 text-slate-700 text-[10px] px-2 py-0.5 rounded font-bold">완료됨</span>'
+                    : '<span class="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded font-bold">진행중</span>';
+
+                const taxPercentText = Math.round(taxRate * 1000) / 10;
+
+                return `
+                    <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border ${p.isCompleted ? 'border-slate-300 bg-slate-50/50 opacity-90' : 'border-slate-200'} space-y-3">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 border-b pb-3">
+                            <div class="flex items-center gap-2.5 flex-wrap">
+                                <span class="bg-blue-100 text-blue-800 text-xs font-bold px-2.5 py-1 rounded-lg">${p.month}</span>
+                                <h3 class="font-bold text-slate-900 text-sm sm:text-base">${p.name}</h3>
+                                ${completedBadge}
+                            </div>
+                            <div class="flex items-center gap-1.5 flex-wrap w-full sm:w-auto justify-end">
+                                <button type="button" onclick="toggleProjectCompleted(${p.id})" class="text-xs px-2.5 py-1 rounded-lg border font-semibold ${p.isCompleted ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100' : 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-slate-200'} transition">
+                                    <i class="fa-solid fa-check mr-1"></i> ${p.isCompleted ? '완료 취소' : '완료 처리'}
+                                </button>
+                                ${!p.isCompleted ? `<button type="button" onclick="viewProjectTodos(${p.id})" class="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold px-2.5 py-1 rounded-lg transition border border-indigo-200"><i class="fa-solid fa-list-check mr-1"></i> 업무보드</button>` : ''}
+                                <button type="button" onclick="viewProjectExpenses(${p.id})" class="text-xs bg-teal-50 hover:bg-teal-100 text-teal-700 font-bold px-2.5 py-1 rounded-lg transition border border-teal-200">
+                                    <i class="fa-solid fa-receipt mr-1"></i> 지출보기(${pExps.length})
+                                </button>
+                                <button type="button" onclick="editProject(${p.id})" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded-lg transition">수정</button>
+                                <button type="button" onclick="deleteProject(${p.id})" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 px-2.5 py-1 rounded-lg transition">삭제</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-3 rounded-lg border border-slate-100">
+                            <div>
+                                <span class="text-slate-500 block mb-0.5">계약금액 (수입)</span>
+                                <span class="font-bold text-slate-900 text-sm">${formatKW(p.amount)}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block mb-0.5">총 지출합계</span>
+                                <span class="font-bold text-rose-600 text-sm">${formatKW(sumExp)}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block mb-0.5">회사 유보금 (${Math.round(p.reserve*100)}%)</span>
+                                <span class="font-bold text-blue-600 text-sm">${formatKW(reserveAmt)}</span>
+                            </div>
+                            <div>
+                                <span class="text-slate-500 block mb-0.5">순수익 마진</span>
+                                <span class="font-bold text-emerald-600 text-sm">${formatKW(netProfit)}</span>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col sm:flex-row justify-between text-[11px] sm:text-xs text-slate-600 pt-1 px-1 gap-1">
+                            <div>발주사: <b class="text-slate-800">${p.client || '미입력'}</b> | 담당자: <b class="text-slate-800">${p.contactPerson || '미입력'}</b> (연락처: <b class="text-slate-800">${p.contactPhone || '미입력'}</b> / 이메일: <b class="text-slate-800">${p.contactEmail || '미입력'}</b>) | 파트너 지급일: <b class="text-indigo-600">${p.partnerDate || '미정'}</b></div>
+                            <div>대표 배분액(세후): <b class="text-emerald-700">${formatKW(repShare)}</b> | 파트너 배분액(총액지급: ${formatKW(partnerGross)} / 원천세(${taxPercentText}%): ${formatKW(partnerTax)} 회사부담 차감 후 실수령: <b class="text-indigo-700">${formatKW(partnerNet)}</b>)</div>
+                        </div>
+                        ${p.memo ? `<div class="text-[11px] text-slate-500 bg-amber-50/50 p-2 rounded border border-amber-100/60">메모: ${p.memo}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderExpenses() {
+            const container = document.getElementById('expense-list-container');
+            const filterBanner = document.getElementById('expense-filter-banner');
+            const filterNameSpan = document.getElementById('filter-project-name');
+
+            let targetExpenses = expenses;
+            if (selectedProjectIdFilter !== null) {
+                targetExpenses = expenses.filter(ex => ex.projectId === selectedProjectIdFilter);
+                const proj = projects.find(p => p.id === selectedProjectIdFilter);
+                filterNameSpan.innerText = proj ? proj.name : '선택 사업';
+                filterBanner.classList.remove('flex');
+                filterBanner.classList.add('flex');
+            } else {
+                filterBanner.classList.remove('flex');
+                filterBanner.classList.add('hidden');
+            }
+
+            if (targetExpenses.length === 0) {
+                container.innerHTML = '<div class="bg-white p-6 rounded-xl text-center text-slate-400 text-xs sm:text-sm border">등록된 지출 내역이 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = targetExpenses.map(ex => {
+                const proj = projects.find(p => p.id === ex.projectId);
+                const projName = proj ? proj.name : '삭제된 사업';
+
+                let badgeColor = 'bg-slate-100 text-slate-700';
+                if (ex.status === '지급완료') badgeColor = 'bg-emerald-100 text-emerald-800 font-bold';
+                else if (ex.status === '지급예정') badgeColor = 'bg-amber-100 text-amber-800 font-bold';
+                else if (ex.status === '발주') badgeColor = 'bg-blue-100 text-blue-800';
+                else if (ex.status === '배송중') badgeColor = 'bg-indigo-100 text-indigo-800';
+                else if (ex.status === '배송완료' || ex.status === '예약완료') badgeColor = 'bg-teal-100 text-teal-800';
+
+                const taxRatePercent = Math.round((ex.taxRate || 0.033) * 1000) / 10;
+
+                return `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 text-xs sm:text-sm">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-[11px] font-bold">${ex.date}</span>
+                                <span class="bg-teal-50 text-teal-800 px-2 py-0.5 rounded text-[11px] font-semibold">${projName}</span>
+                                <span class="px-2 py-0.5 rounded text-[11px] ${badgeColor}">${ex.status}</span>
+                                ${ex.isWithholdingTax ? `<span class="bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.5 rounded text-[10px] font-bold">원천세 ${taxRatePercent}% 대상</span>` : ''}
+                            </div>
+                            <div class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                <span>${ex.vendor}</span>
+                                <span class="text-xs text-slate-500 font-normal">(${ex.category || '기타'})</span>
+                            </div>
+                            <div class="text-slate-500 text-xs flex items-center gap-2">
+                                <span>증빙: <b class="text-slate-700">${ex.proof}</b></span>
+                                ${ex.memo ? `<span>| 메모: ${ex.memo}</span>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-3 w-full sm:w-auto justify-between sm:justify-end border-t sm:border-t-0 pt-2 sm:pt-0">
+                            <div class="text-base font-bold text-rose-600">${formatKW(ex.amount)}</div>
+                            <div class="flex items-center gap-1">
+                                <button type="button" onclick="editExpense(${ex.id})" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded transition">수정</button>
+                                <button type="button" onclick="deleteExpense(${ex.id})" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 px-2.5 py-1 rounded transition">삭제</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderSummary() {
+            const container = document.getElementById('summary-list-container');
+            const map = {};
+
+            projects.forEach(p => {
+                const m = p.month || '미분류';
+                if (!map[m]) map[m] = { month: m, revenue: 0, expense: 0, count: 0 };
+                map[m].revenue += p.amount;
+                const pExps = expenses.filter(ex => ex.projectId === p.id);
+                map[m].expense += pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                map[m].count += 1;
+            });
+
+            const sortedMonths = Object.keys(map).sort().reverse();
+            if (sortedMonths.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-400 py-6 text-xs">요약할 데이터가 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = `
+                <table class="w-full text-xs sm:text-sm text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-100 text-slate-700 border-b">
+                            <th class="p-3">정산 연월</th>
+                            <th class="p-3 text-center">진행 사업수</th>
+                            <th class="p-3 text-right">총 수입 (공급가)</th>
+                            <th class="p-3 text-right">총 지출 (지급예정 포함)</th>
+                            <th class="p-3 text-right">월간 순수익 마진</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        ${sortedMonths.map(m => {
+                            const data = map[m];
+                            const profit = data.revenue - data.expense;
+                            return `
+                                <tr class="hover:bg-slate-50">
+                                    <td class="p-3 font-bold text-slate-900">${data.month}</td>
+                                    <td class="p-3 text-center">${data.count}건</td>
+                                    <td class="p-3 text-right font-semibold text-slate-800">${formatKW(data.revenue)}</td>
+                                    <td class="p-3 text-right font-semibold text-rose-600">${formatKW(data.expense)}</td>
+                                    <td class="p-3 text-right font-bold text-emerald-600">${formatKW(profit)}</td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function renderTaxYears() {
+            const select = document.getElementById('tax-year-select');
+            const yearsSet = new Set();
+            projects.forEach(p => {
+                if (p.month && p.month.length >= 4) yearsSet.add(p.month.slice(0, 4));
+            });
+            const currentYearStr = String(new Date().getFullYear());
+            yearsSet.add(currentYearStr);
+
+            const sortedYears = Array.from(yearsSet).sort().reverse();
+            const currentVal = select.value || currentYearStr;
+
+            select.innerHTML = sortedYears.map(y => `<option value="${y}" ${y === currentVal ? 'selected' : ''}>${y}년도</option>`).join('');
+            document.getElementById('tax-card-year-1').innerText = select.value || currentYearStr;
+        }
+
+        function renderTaxEstimates() {
+            renderTaxYears();
+            const year = document.getElementById('tax-year-select').value || String(new Date().getFullYear());
+            document.getElementById('tax-card-year-1').innerText = year;
+
+            const yearProjects = projects.filter(p => p.month && p.month.startsWith(year));
+            const rev = yearProjects.reduce((acc, cur) => acc + cur.amount, 0);
+            let exp = 0;
+            yearProjects.forEach(p => {
+                exp += expenses.filter(ex => ex.projectId === p.id).reduce((acc, cur) => acc + cur.amount, 0);
+            });
+            const profit = rev - exp;
+
+            document.getElementById('tax-year-revenue').innerText = formatKW(rev);
+            document.getElementById('tax-year-expense').innerText = formatKW(exp);
+            document.getElementById('tax-year-profit').innerText = formatKW(profit);
+
+            let taxBase = Math.max(0, profit - 1500000);
+            let cit = 0;
+            let rateStr = '6%';
+            if (taxBase <= 14000000) { cit = taxBase * 0.06; rateStr = '6%'; }
+            else if (taxBase <= 50000000) { cit = 840000 + (taxBase - 14000000) * 0.15; rateStr = '15%'; }
+            else if (taxBase <= 88000000) { cit = 5240000 + (taxBase - 50000000) * 0.24; rateStr = '24%'; }
+            else if (taxBase <= 150000000) { cit = 14360000 + (taxBase - 88000000) * 0.35; rateStr = '35%'; }
+            else if (taxBase <= 300000000) { cit = 36160000 + (taxBase - 150000000) * 0.38; rateStr = '38%'; }
+            else if (taxBase <= 500000000) { cit = 93160000 + (taxBase - 300000000) * 0.40; rateStr = '40%'; }
+            else if (taxBase <= 1000000000) { cit = 173160000 + (taxBase - 500000000) * 0.42; rateStr = '42%'; }
+            else { cit = 383160000 + (taxBase - 1000000000) * 0.45; rateStr = '45%'; }
+
+            const finalCit = cit * 1.1; 
+            document.getElementById('cit-rate-badge').innerText = `세율 ${rateStr}`;
+            document.getElementById('cit-tax-base').innerText = formatKW(taxBase);
+            document.getElementById('cit-calculated-tax').innerText = formatKW(cit);
+            document.getElementById('cit-final-tax').innerText = formatKW(finalCit);
+
+            const vatOutput = rev * 0.1;
+            const vatInput = exp * 0.05;
+            const finalVat = Math.max(0, vatOutput - vatInput);
+            document.getElementById('vat-output-tax').innerText = formatKW(vatOutput);
+            document.getElementById('vat-input-tax').innerText = `- ${formatKW(vatInput)}`;
+            document.getElementById('vat-final-tax').innerText = formatKW(finalVat);
+
+            renderTaxBracketTable(taxBase);
+        }
+
+        function calculateBracketTax(taxBaseAmount) {
+            let base = Math.max(0, taxBaseAmount);
+            let cit = 0;
+            if (base <= 14000000) cit = base * 0.06;
+            else if (base <= 50000000) cit = 840000 + (base - 14000000) * 0.15;
+            else if (base <= 88000000) cit = 5240000 + (base - 50000000) * 0.24;
+            else if (base <= 150000000) cit = 14360000 + (base - 88000000) * 0.35;
+            else if (base <= 300000000) cit = 36160000 + (base - 150000000) * 0.38;
+            else if (base <= 500000000) cit = 93160000 + (base - 300000000) * 0.40;
+            else if (base <= 1000000000) cit = 173160000 + (base - 500000000) * 0.42;
+            else cit = 383160000 + (base - 1000000000) * 0.45;
+            return cit * 1.1;
+        }
+
+        function renderTaxBracketTable(currentTaxBase) {
+            const brackets = [
+                { name: '1,400만원 이하', rate: '6%', deduction: '0원', min: 0, max: 14000000 },
+                { name: '1,400만 ~ 5,000만원', rate: '15%', deduction: '1,260,000원', min: 14000001, max: 50000000 },
+                { name: '5,000만 ~ 8,800만원', rate: '24%', deduction: '5,760,000원', min: 50000001, max: 88000000 },
+                { name: '8,800만 ~ 1억 5,000만원', rate: '35%', deduction: '15,440,000원', min: 88000001, max: 150000000 },
+                { name: '1억 5,000만 ~ 3억원', rate: '38%', deduction: '19,940,000원', min: 150000001, max: 300000000 },
+                { name: '3억 ~ 5억원', rate: '40%', deduction: '25,940,000원', min: 300000001, max: 500000000 },
+                { name: '5억 ~ 10억원', rate: '42%', deduction: '35,940,000원', min: 500000001, max: 1000000000 },
+                { name: '10억원 초과', rate: '45%', deduction: '65,940,000원', min: 1000000001, max: Infinity }
+            ];
+
+            let activeIndex = 0;
+            brackets.forEach((b, idx) => {
+                if (currentTaxBase >= b.min && currentTaxBase <= b.max) activeIndex = idx;
+            });
+
+            const currentBracket = brackets[activeIndex];
+            const tbody = document.getElementById('tax-bracket-table-body');
+            
+            tbody.innerHTML = brackets.map((b, idx) => {
+                const isCurrent = idx === activeIndex;
+                let minTax = calculateBracketTax(b.min);
+                let maxTax = b.max === Infinity ? '무제한 (초과분 45%)' : formatKW(calculateBracketTax(b.max));
+                let taxRangeStr = `${formatKW(minTax)} ~ ${maxTax}`;
+                if (b.min === 0) {
+                    taxRangeStr = `0 원 ~ ${formatKW(calculateBracketTax(14000000))}`;
+                }
+
+                return `
+                    <tr class="${isCurrent ? 'bg-indigo-50/80 font-bold border-l-4 border-indigo-600' : 'hover:bg-slate-50'}">
+                        <td class="p-2.5 text-slate-800">${b.name}</td>
+                        <td class="p-2.5 text-slate-700">${b.rate}</td>
+                        <td class="p-2.5 text-slate-600">${b.deduction}</td>
+                        <td class="p-2.5 text-slate-700 font-medium">${taxRangeStr}</td>
+                        <td class="p-2.5 text-center">
+                            ${isCurrent ? '<span class="bg-indigo-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm">📍 내 위치</span>' : '<span class="text-slate-400 text-[11px]">-</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            const noticeEl = document.getElementById('next-tier-notice');
+            if (currentBracket.max !== Infinity) {
+                const diff = currentBracket.max - currentTaxBase;
+                if (diff > 0) {
+                    noticeEl.innerHTML = `💡 다음 과세표준 구간 진입까지 남은 순소득: <b class="text-indigo-900">${formatKW(diff)}</b>`;
+                } else {
+                    noticeEl.innerHTML = `🚀 다음 세율 구간 진입 직전입니다!`;
+                }
+            } else {
+                noticeEl.innerHTML = `🏆 최고 세율 구간에 도달해 있습니다.`;
+            }
+        }
+
+        function renderDashboardActiveTodos() {
+            const container = document.getElementById('dash-active-todos-container');
+            const activeProjectsMap = new Set(projects.filter(p => !p.isCompleted).map(p => p.id));
+            const activeTodos = todos.filter(t => t.status !== 'Done' && activeProjectsMap.has(t.projectId));
+
+            if (activeTodos.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-center text-slate-400 py-6 text-xs bg-slate-50 rounded-lg border border-dashed">현재 미완료된 업무가 없습니다. 모든 업무가 완료되었습니다! 🎉</div>';
+                return;
+            }
+
+            container.innerHTML = activeTodos.slice(0, 6).map(t => {
+                const p = projects.find(proj => proj.id === t.projectId);
+                const projName = p ? p.name : '기타 사업';
+                const dDay = getDDayInfo(t.dueDate);
+
+                let badgeBg = 'bg-slate-100 text-slate-700';
+                if (t.status === '진행 중') badgeBg = 'bg-sky-100 text-sky-800 font-bold';
+
+                return `
+                    <div onclick="viewProjectTodos(${t.projectId})" class="bg-slate-50 hover:bg-indigo-50/40 p-3.5 rounded-xl border border-slate-200 hover:border-indigo-300 transition cursor-pointer space-y-2 shadow-sm flex flex-col justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between gap-1">
+                                <span class="text-[10px] bg-teal-50 text-teal-800 px-2 py-0.5 rounded font-semibold truncate max-w-[140px]">${projName}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded border ${dDay.badgeClass}">${dDay.text}</span>
+                            </div>
+                            <h4 class="font-bold text-slate-900 text-xs sm:text-sm line-clamp-1">${t.title}</h4>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] pt-2 border-t border-slate-200/60">
+                            <span class="px-2 py-0.5 rounded ${badgeBg}">${t.status}</span>
+                            <span class="text-slate-500">담당: ${t.assignee || '미지정'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTaxDdayNotification() {
+            let partnerTax = 0;
+            let expenseTax = 0;
+            const now = new Date();
+            const currentYearMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`;
+
+            projects.forEach(p => {
+                if (p.partnerDate && p.partnerDate.slice(0,7) === currentYearMonth) {
+                    const netProfit = p.amount - expenses.filter(ex => ex.projectId === p.id).reduce((acc, cur) => acc + cur.amount, 0);
+                    if (netProfit > 0) {
+                        const afterReserve = netProfit - (netProfit * p.reserve);
+                        const taxRate = p.partnerTaxRate || 0.033;
+                        const repRatio = p.split;
+                        const partRatio = 1 - p.split;
+                        const denom = repRatio + partRatio / (1 - taxRate);
+                        const partnerGross = afterReserve * (partRatio / denom) / (1 - taxRate);
+                        partnerTax += partnerGross * taxRate; 
+                    }
+                }
+            });
+
+            expenses.forEach(ex => {
+                if (ex.date && ex.date.slice(0,7) === currentYearMonth && ex.isWithholdingTax) {
+                    expenseTax += ex.amount * (ex.taxRate || 0.033);
+                }
+            });
+
+            const totalTax = partnerTax + expenseTax;
+            document.getElementById('dash-partner-tax').innerText = formatKW(partnerTax);
+            document.getElementById('dash-expense-tax').innerText = formatKW(expenseTax);
+            document.getElementById('dash-tax-due-amount').innerText = formatKW(totalTax);
+
+            const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 10);
+            const dueDateStr = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth()+1).padStart(2,'0')}-10`;
+            document.getElementById('dash-tax-due-date').innerText = dueDateStr;
+
+            const diffTime = nextMonth.getTime() - now.setHours(0,0,0,0);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const badge = document.getElementById('tax-dday-badge');
+            if (diffDays >= 0) {
+                badge.innerText = `납부까지 D-${diffDays}`;
+            } else {
+                badge.innerText = `납부 기한 경과`;
+            }
+        }
+
+        function renderDashboardCharts() {
+            const monthsMap = {};
+            projects.forEach(p => {
+                const m = p.month || '2026-01';
+                if (!monthsMap[m]) monthsMap[m] = { revenue: 0, expense: 0, margin: 0 };
+                monthsMap[m].revenue += p.amount;
+                const pExps = expenses.filter(ex => ex.projectId === p.id);
+                const expSum = pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                monthsMap[m].expense += expSum;
+                monthsMap[m].margin += (p.amount - expSum);
+            });
+
+            const sortedMonths = Object.keys(monthsMap).sort();
+            const revData = sortedMonths.map(m => monthsMap[m].revenue);
+            const expData = sortedMonths.map(m => monthsMap[m].expense);
+            const marginData = sortedMonths.map(m => monthsMap[m].margin);
+
+            const ctxMonthly = document.getElementById('monthlyTrendChart').getContext('2d');
+            if (monthlyChart) monthlyChart.destroy();
+            monthlyChart = new Chart(ctxMonthly, {
+                type: 'bar',
+                data: {
+                    labels: sortedMonths,
+                    datasets: [
+                        { label: '수입', data: revData, backgroundColor: '#3b82f6', borderRadius: 4 },
+                        { label: '지출', data: expData, backgroundColor: '#f43f5e', borderRadius: 4 },
+                        { label: '순마진', data: marginData, backgroundColor: '#10b981', borderRadius: 4, type: 'line', borderColor: '#10b981', borderWidth: 2, tension: 0.2 }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+
+            let totalReserve = 0;
+            let totalRep = 0;
+            let totalPartner = 0;
+
+            projects.forEach(p => {
+                const pExps = expenses.filter(ex => ex.projectId === p.id);
+                const sumExp = pExps.reduce((acc, cur) => acc + cur.amount, 0);
+                const net = p.amount - sumExp;
+                if (net > 0) {
+                    const res = net * p.reserve;
+                    const after = net - res;
+                    const taxRate = p.partnerTaxRate || 0.033;
+                    const repRatio = p.split;
+                    const partRatio = 1 - p.split;
+                    const denom = repRatio + partRatio / (1 - taxRate);
+                    totalReserve += res;
+                    totalRep += after * (repRatio / denom);
+                    totalPartner += after * (partRatio / denom);
+                }
+            });
+
+            const combinedTaxDue = calculateCombinedTaxDue();
+            const netReserve = Math.max(0, totalReserve - combinedTaxDue);
+
+            const ctxPie = document.getElementById('marginAllocationChart').getContext('2d');
+            if (pieChart) pieChart.destroy();
+            pieChart = new Chart(ctxPie, {
+                type: 'doughnut',
+                data: {
+                    labels: ['순 유보금 (세금차감후)', `종소세/부가세 납부예정`, '대표 분배금(세후)', '파트너 분배금(실수령)'],
+                    datasets: [{
+                        data: [netReserve, combinedTaxDue, totalRep, totalPartner],
+                        backgroundColor: ['#3b82f6', '#f43f5e', '#10b981', '#f59e0b'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+            });
+        }
+
+        function renderTodoTabContent() {
+            const stepSelect = document.getElementById('todo-step-project-select');
+            const stepKanban = document.getElementById('todo-step-kanban-board');
+
+            if (currentTodoSelectedProjectId === null) {
+                stepSelect.classList.remove('hidden');
+                stepKanban.classList.add('hidden');
+
+                const grid = document.getElementById('todo-project-cards-grid');
+                const activeProjects = projects.filter(p => !p.isCompleted);
+                const completedProjects = projects.filter(p => p.isCompleted);
+
+                document.getElementById('completed-project-count').innerText = completedProjects.length;
+                const archiveContainer = document.getElementById('todo-completed-folder-content');
+                if (completedProjects.length === 0) {
+                    archiveContainer.innerHTML = '<div class="text-xs text-slate-400 py-2 px-2">완료된 사업이 없습니다.</div>';
+                } else {
+                    archiveContainer.innerHTML = completedProjects.map(cp => `
+                        <div class="bg-white p-2.5 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold">${cp.month}</span>
+                                <span class="font-bold text-slate-800">${cp.name}</span>
+                            </div>
+                            <button type="button" onclick="toggleProjectCompleted(${cp.id})" class="text-xs text-indigo-600 hover:underline font-semibold">완료 취소하기</button>
+                        </div>
+                    `).join('');
+                }
+
+                if (activeProjects.length === 0) {
+                    grid.innerHTML = '<div class="col-span-full bg-white p-6 rounded-xl text-center text-slate-400 text-xs sm:text-sm border">진행 중인 사업이 없습니다. (완료된 사업은 아래 아카이브 폴더에 정리되어 있습니다.)</div>';
+                    return;
+                }
+
+                grid.innerHTML = activeProjects.map(p => {
+                    const pTodos = todos.filter(t => t.projectId === p.id);
+                    const doneCount = pTodos.filter(t => t.status === 'Done').length;
+                    const totalCount = pTodos.length;
+                    const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+
+                    return `
+                        <div onclick="viewProjectTodos(${p.id})" class="bg-white hover:bg-slate-50 p-5 rounded-xl shadow-sm border border-slate-200 hover:border-indigo-300 transition cursor-pointer space-y-3 flex flex-col justify-between">
+                            <div class="space-y-1.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs bg-indigo-50 text-indigo-700 font-bold px-2.5 py-1 rounded-lg">${p.month}</span>
+                                    <span class="text-xs text-slate-500 font-semibold">업무 ${totalCount}건</span>
+                                </div>
+                                <h3 class="font-bold text-slate-900 text-base">${p.name}</h3>
+                                <p class="text-xs text-slate-500">발주사: ${p.client || '미입력'}</p>
+                            </div>
+                            <div class="space-y-1 pt-3 border-t">
+                                <div class="flex justify-between text-xs font-semibold text-slate-600">
+                                    <span>업무 완료율</span>
+                                    <span>${progressPercent}% (${doneCount}/${totalCount})</span>
+                                </div>
+                                <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                    <div class="bg-indigo-600 h-full rounded-full transition-all" style="width: ${progressPercent}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                stepSelect.classList.add('hidden');
+                stepKanban.classList.remove('hidden');
+
+                const currentProj = projects.find(p => p.id === currentTodoSelectedProjectId);
+                if (!currentProj) {
+                    currentTodoSelectedProjectId = null;
+                    renderTodoTabContent();
+                    return;
+                }
+
+                document.getElementById('todo-board-title').innerText = currentProj.name;
+                document.getElementById('todo-board-month-badge').innerText = currentProj.month;
+
+                const pTodos = todos.filter(t => t.projectId === currentProj.id);
+                const startTodos = pTodos.filter(t => t.status === '시작 전');
+                const progTodos = pTodos.filter(t => t.status === '진행 중');
+                const doneTodos = pTodos.filter(t => t.status === 'Done');
+
+                document.getElementById('count-todo-start').innerText = startTodos.length;
+                document.getElementById('count-todo-progress').innerText = progTodos.length;
+                document.getElementById('count-todo-done').innerText = doneTodos.length;
+
+                renderKanbanColumn('column-todo-start', startTodos);
+                renderKanbanColumn('column-todo-progress', progTodos);
+                renderKanbanColumn('column-todo-done', doneTodos);
+            }
+        }
+
+        function renderKanbanColumn(containerId, list) {
+            const container = document.getElementById(containerId);
+            if (list.length === 0) {
+                container.innerHTML = '<div class="text-center text-slate-400 py-8 text-xs bg-white/50 rounded-lg border border-dashed border-slate-200">업무가 없습니다.</div>';
+                return;
+            }
+
+            container.innerHTML = list.map(t => {
+                const dDay = getDDayInfo(t.dueDate);
+                let priorityBadge = '';
+                if (t.priority === '높음') priorityBadge = '<span class="bg-rose-100 text-rose-700 font-bold px-1.5 py-0.5 rounded text-[10px]">🔥 높음</span>';
+
+                return `
+                    <div class="bg-white p-3.5 rounded-xl shadow-sm border border-slate-200 space-y-2 hover:border-indigo-300 transition group">
+                        <div class="flex items-start justify-between gap-2">
+                            <h4 onclick="openTodoModal(${t.id})" class="font-bold text-slate-900 text-xs sm:text-sm cursor-pointer hover:text-indigo-600 transition line-clamp-2">${t.title}</h4>
+                            <button type="button" onclick="openTodoModal(${t.id})" class="text-slate-400 hover:text-slate-700 opacity-0 group-hover:opacity-100 transition p-1"><i class="fa-solid fa-pen text-xs"></i></button>
+                        </div>
+                        ${t.desc ? `<p class="text-xs text-slate-500 line-clamp-2 bg-slate-50 p-2 rounded">${t.desc}</p>` : ''}
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="px-2 py-0.5 rounded border ${dDay.badgeClass}">${dDay.text}</span>
+                                ${priorityBadge}
+                            </div>
+                            <span class="text-slate-500 font-medium">👤 ${t.assignee || '미지정'}</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-1 text-[10px] text-slate-400">
+                            <span>이동:</span>
+                            <div class="flex gap-1">
+                                ${t.status !== '시작 전' ? `<button onclick="updateTodoStatusDirect(${t.id}, '시작 전')" class="hover:text-slate-700 underline">시작전</button>` : ''}
+                                ${t.status !== '진행 중' ? `<button onclick="updateTodoStatusDirect(${t.id}, '진행 중')" class="hover:text-sky-600 underline">진행중</button>` : ''}
+                                ${t.status !== 'Done' ? `<button onclick="updateTodoStatusDirect(${t.id}, 'Done')" class="hover:text-emerald-600 underline">완료</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 페이지 최초 실행 시 구글 시트 데이터 로드 시작
+        loadDataFromCloud();
+    </script>
+</body>
+</html>
